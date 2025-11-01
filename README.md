@@ -48,51 +48,6 @@ UserSettings/
 
 ⚠️ Khi upload lên GitHub, chỉ upload thư mục Assets/ và file ProjectSettings/ cần thiết.
 
-🧮 How to Run
-
-Mở Unity Hub → chọn Unity 2021.1.6f1
-
-Chọn Open Project → trỏ đến thư mục gốc của QuizMath
-
-Mở scene chính tại: Assets/Scenes/QuizMath.unity
-
-Nhấn ▶ (Play) để chạy trò chơi
-
-📜 How to Play
-
-Khi bắt đầu, màn hình sẽ hiển thị câu hỏi toán học.
-
-Chọn một trong các đáp án A/B/C/D.
-
-Trả lời đúng → cộng điểm. Sai → trừ điểm hoặc kết thúc tùy chế độ.
-
-Hết thời gian → tự động chuyển sang câu hỏi tiếp theo.
-
-🧰 Scripts Overview
-GameManager.cs
-
-Quản lý trạng thái trò chơi (đang chơi, kết thúc, khởi động lại)
-
-Cập nhật điểm và high score
-
-QuestionGenerator.cs
-
-Sinh phép toán ngẫu nhiên (±, ×, ÷)
-
-Đảm bảo kết quả hợp lệ
-
-UIController.cs
-
-Hiển thị câu hỏi và đáp án
-
-Xử lý sự kiện click của người chơi
-
-SoundManager.cs
-
-Phát âm thanh khi trả lời đúng/sai
-
-Quản lý nhạc nền (optional)
-
 🧾 Git & Upload Instructions
 
 Tạo .gitignore file với nội dung sau:
