@@ -1,19 +1,22 @@
-// Assets/Scripts/GameManager.cs
 using System.Collections;
 using UnityEngine;
 using TMPro;
+using UnityEngine.UI;
 
 public class GameManager : MonoBehaviour
 {
     [Header("References")]
-    public GameObject questionPrefab;         // assign QuestionItem prefab
-    public RectTransform gameArea;            // assign GameArea RectTransform (the visible viewport)
-    public TMP_Text scoreText;                // assign Score Text (TextMeshPro)
-    public TMP_Text gameOverText;             // assign GameOver Text (hidden at start)
+    public GameObject questionPrefab;
+    public RectTransform gameArea;
+    public TMP_Text scoreText;
+    public GameObject gameOverPanel;     // ⚠️ assign GameOverPanel in Inspector
+    public TMP_Text gameOverText;
+    public Button playAgainButton;
+    public Button leaderboardButton;
 
     [Header("Settings")]
-    public float spawnInterval = 1.2f;
-    public float moveSpeed = 200f;
+    public float spawnInterval = 1f;
+    public float moveSpeed = 50f;
     public float addSpeed = 5;
     public int pointsPerCorrect = 10;
 
@@ -24,6 +27,13 @@ public class GameManager : MonoBehaviour
     void Start()
     {
         ValidateSetup();
+
+        // Setup button listeners
+        if (playAgainButton)
+            playAgainButton.onClick.AddListener(Restart);
+        if (leaderboardButton)
+            leaderboardButton.onClick.AddListener(ShowLeaderboard);
+
         StartGame();
     }
 
@@ -32,19 +42,23 @@ public class GameManager : MonoBehaviour
         if (questionPrefab == null) Debug.LogError("GameManager: questionPrefab is not assigned!");
         if (gameArea == null) Debug.LogError("GameManager: gameArea is not assigned!");
         if (scoreText == null) Debug.LogError("GameManager: scoreText is not assigned!");
+        if (gameOverPanel == null) Debug.LogError("GameManager: gameOverPanel is not assigned!");
         if (gameOverText == null) Debug.LogError("GameManager: gameOverText is not assigned!");
     }
 
     public void StartGame()
     {
-
-        // clear existing children
-        for (int i = gameArea.childCount - 1; i >= 0; i--) Destroy(gameArea.GetChild(i).gameObject);
+        // Clear existing children
+        for (int i = gameArea.childCount - 1; i >= 0; i--)
+            Destroy(gameArea.GetChild(i).gameObject);
 
         running = true;
         score = 0;
+        moveSpeed = 50f;
+        spawnInterval = 1f;
         UpdateUI();
-        if (gameOverText) gameOverText.gameObject.SetActive(false);
+
+        if (gameOverPanel) gameOverPanel.SetActive(false);
 
         if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
         spawnCoroutine = StartCoroutine(SpawnLoop());
@@ -61,27 +75,22 @@ public class GameManager : MonoBehaviour
 
     void SpawnQuestion()
     {
-        
-        spawnInterval = 160f/ (moveSpeed *0.8f);
-        moveSpeed = moveSpeed + addSpeed; 
+        spawnInterval = 50f / (moveSpeed * 0.8f);
+        moveSpeed += addSpeed;
 
         if (questionPrefab == null || gameArea == null) return;
 
         GameObject go = Instantiate(questionPrefab, gameArea);
         RectTransform rt = go.GetComponent<RectTransform>();
 
-        // place at bottom inside gameArea
         float itemHeight = rt.rect.height;
-        float bottomY = -(gameArea.rect.height / 2f) + 10f  ; // +10 padding
+        float bottomY = -(gameArea.rect.height / 2f) + 10f;
         rt.anchoredPosition = new Vector2(0f, bottomY);
 
-        // compute top threshold
         float topY = (gameArea.rect.height / 2f) + (itemHeight / 2f);
 
-        // generate question
         var q = MathGenerator.GenerateRandom();
 
-        // get component and setup
         QuestionItem qi = go.GetComponent<QuestionItem>();
         if (qi == null)
         {
@@ -93,6 +102,14 @@ public class GameManager : MonoBehaviour
         qi.Setup(q, moveSpeed, topY);
         qi.OnAnsweredCorrect += HandleCorrect;
         qi.OnAnsweredWrong += HandleWrong;
+
+        // 🔹 Đồng bộ tốc độ cho tất cả câu hỏi hiện có
+        foreach (Transform child in gameArea)
+        {
+            var other = child.GetComponent<QuestionItem>();
+            if (other != null)
+                other.SetSpeed(moveSpeed);
+        }
     }
 
     void HandleCorrect()
@@ -103,26 +120,61 @@ public class GameManager : MonoBehaviour
 
     void HandleWrong()
     {
+        if (!running) return;
         running = false;
         if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
 
-        if (gameOverText)
+        // 🔴 Dừng tất cả câu hỏi
+        foreach (Transform child in gameArea)
         {
-            gameOverText.gameObject.SetActive(true);
-            gameOverText.text = "Game Over\nScore: " + score;
+            QuestionItem qi = child.GetComponent<QuestionItem>();
+            if (qi != null)
+            {
+                qi.StopMoving();
+            }
         }
 
-        // optional: clear remaining spawned items
+        // 🔴 Hiện panel mờ
+        if (gameOverPanel)
+        {
+            CanvasGroup cg = gameOverPanel.GetComponent<CanvasGroup>();
+            if (cg != null) 
+                StartCoroutine(FadeInPanel(cg));   // 👈 gọi hiệu ứng mờ dần
+            else   
+                gameOverPanel.SetActive(true);     // fallback nếu chưa có CanvasGroup
+        }
+
+        if (gameOverText)
+        {
+            gameOverText.text = "Game Over\nScore: " + score;
+        }
     }
 
     void UpdateUI()
     {
-        if (scoreText) scoreText.text = "Score: " + score;
+        if (scoreText)
+            scoreText.text = "Score: " + score;
     }
 
-    // optional restart method hooked to UI button
     public void Restart()
     {
         StartGame();
+    }
+
+    void ShowLeaderboard()
+    {
+        Debug.Log("Show leaderboard (tạm thời chỉ log)");
+        // TODO: hiển thị bảng điểm thật sau này
+    }
+    
+    IEnumerator FadeInPanel(CanvasGroup cg)
+    {
+        cg.alpha = 0;
+        cg.gameObject.SetActive(true);
+        while (cg.alpha < 1)
+        {
+           cg.alpha += Time.deltaTime;
+            yield return null;
+        }
     }
 }

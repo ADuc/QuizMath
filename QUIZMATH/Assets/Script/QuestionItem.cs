@@ -1,131 +1,100 @@
-// Assets/Scripts/QuestionItem.cs
 using System;
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
+using UnityEngine.UI;
 
-[RequireComponent(typeof(RectTransform))]
 public class QuestionItem : MonoBehaviour
 {
-    [Header("UI refs")]
-    public TextMeshProUGUI questionText;
+    public TMP_Text questionText;
     public Button leftButton;
     public Button rightButton;
-    public TextMeshProUGUI leftText;
-    public TextMeshProUGUI rightText;
-    public Image leftBg;
-    public Image rightBg;
 
-    [Header("Colors")]
-    public Color defaultBg = new Color(0.95f,0.95f,0.95f);
-    public Color correctColor = new Color(0.13f,0.56f,0.99f);
-    public Color wrongColor = new Color(0.91f,0.42f,0.38f);
+    float moveSpeed;
+    float topY;
+    bool answered = false;
+    bool stopped = false;
 
-    [HideInInspector] public int correctAnswer;
-    [HideInInspector] public float moveSpeed = 160f;
-    [HideInInspector] public float topThreshold = 1200f;
+    bool correctIsLeft;
 
     public event Action OnAnsweredCorrect;
     public event Action OnAnsweredWrong;
 
-    RectTransform rt;
-    bool answered = false;
-
-    void Awake()
+    public void Setup(MathGenerator.Q q, float speed, float topLimit)
     {
-        rt = GetComponent<RectTransform>();
-        // ensure listeners set (we also set them in Setup to avoid duplicates)
-    }
-
-    // Setup called by GameManager after Instantiate
-    public void Setup(MathGenerator.Q q, float speed, float topY)
-    {
-        answered = false;
         moveSpeed = speed;
-        topThreshold = topY;
+        topY = topLimit;
 
-        questionText.text = q.display;
-        correctAnswer = q.answer;
+        if (questionText) questionText.text = q.display;
 
-        int wrong = MathGenerator.MakeWrongAnswer(correctAnswer);
-        bool leftIsCorrect = UnityEngine.Random.value > 0.5f;
+        correctIsLeft = UnityEngine.Random.Range(0, 2) == 0;
+        int wrongAns = MathGenerator.MakeWrongAnswer(q.answer);
 
-        if (leftIsCorrect)
+        TMP_Text ltxt = leftButton.GetComponentInChildren<TMP_Text>();
+        TMP_Text rtxt = rightButton.GetComponentInChildren<TMP_Text>();
+
+        if (correctIsLeft)
         {
-            leftText.text = correctAnswer.ToString();
-            rightText.text = wrong.ToString();
+            if (ltxt) ltxt.text = q.answer.ToString();
+            if (rtxt) rtxt.text = wrongAns.ToString();
+            leftButton.onClick.AddListener(() => Choose(true, leftButton));
+            rightButton.onClick.AddListener(() => Choose(false, rightButton));
         }
         else
         {
-            leftText.text = wrong.ToString();
-            rightText.text = correctAnswer.ToString();
-        }
-
-        ResetUI();
-
-        leftButton.onClick.RemoveAllListeners();
-        rightButton.onClick.RemoveAllListeners();
-
-        leftButton.onClick.AddListener(() => OnAnswerSelected(true));
-        rightButton.onClick.AddListener(() => OnAnswerSelected(false));
-    }
-
-    void ResetUI()
-    {
-        if (leftBg) leftBg.color = defaultBg;
-        if (rightBg) rightBg.color = defaultBg;
-        if (leftText) leftText.color = Color.black;
-        if (rightText) rightText.color = Color.black;
-        leftButton.interactable = true;
-        rightButton.interactable = true;
-    }
-
-    void Update()
-    {
-        // move item upward in parent's local space
-        rt.anchoredPosition += Vector2.up * moveSpeed * Time.deltaTime;
-
-        if (rt.anchoredPosition.y > topThreshold)
-        {
-            // destroy when offscreen
-            Destroy(gameObject);
+            if (ltxt) ltxt.text = wrongAns.ToString();
+            if (rtxt) rtxt.text = q.answer.ToString();
+            leftButton.onClick.AddListener(() => Choose(false, leftButton));
+            rightButton.onClick.AddListener(() => Choose(true, rightButton));
         }
     }
 
-    void OnAnswerSelected(bool isLeft)
+    void Choose(bool correct, Button pressed)
     {
         if (answered) return;
         answered = true;
 
-        int selected = isLeft ? int.Parse(leftText.text) : int.Parse(rightText.text);
-        if (selected == correctAnswer)
+        // ✅ Khi trả lời đúng → đổi màu nút
+        if (correct)
         {
-            // correct: color blue, award points, keep moving
-            if (isLeft) leftBg.color = correctColor; else rightBg.color = correctColor;
-            leftButton.interactable = false;
-            rightButton.interactable = false;
+            pressed.image.color = Color.green; // nút đúng
+            GetOtherButton(pressed).image.color = new Color(0.7f, 0.7f, 0.7f); // nút còn lại xám đi
             OnAnsweredCorrect?.Invoke();
-            // optionally destroy after a delay:
-            Destroy(gameObject, 0.6f);
         }
         else
         {
-            // wrong: show red and show correct, then trigger game over
-            if (isLeft) leftBg.color = wrongColor; else rightBg.color = wrongColor;
-            // highlight the correct one
-            if (int.Parse(leftText.text) == correctAnswer) leftBg.color = correctColor;
-            if (int.Parse(rightText.text) == correctAnswer) rightBg.color = correctColor;
-
-            leftButton.interactable = false;
-            rightButton.interactable = false;
-
-            // small delay so player sees color
-            Invoke(nameof(TriggerWrong), 0.45f);
+            pressed.image.color = Color.red; // nút sai
+            OnAnsweredWrong?.Invoke();
         }
     }
 
-    void TriggerWrong()
+    Button GetOtherButton(Button pressed)
     {
-        OnAnsweredWrong?.Invoke();
+        return pressed == leftButton ? rightButton : leftButton;
+    }
+
+    void Update()
+    {
+        if (stopped) return;
+
+        transform.Translate(Vector3.up * moveSpeed * Time.deltaTime);
+
+        // ❌ Nếu chưa trả lời mà vượt top thì tính là sai
+        if (!answered && transform.localPosition.y > topY)
+        {
+            answered = true;
+            OnAnsweredWrong?.Invoke();
+        }
+    }
+
+    // 🔸 cho GameManager gọi khi cần dừng tất cả
+    public void StopMoving()
+    {
+        stopped = true;
+    }
+
+    // 🔸 cho GameManager cập nhật tốc độ
+    public void SetSpeed(float newSpeed)
+    {
+        moveSpeed = newSpeed;
     }
 }
