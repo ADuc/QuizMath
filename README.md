@@ -44,3 +44,5 @@ Copy code
 /UserSettings/
 !.gitignore
 !/Assets/
+Tác giả: Lê Anh Đức — 2025
+License: MIT
